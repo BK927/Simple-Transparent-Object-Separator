@@ -1,0 +1,12 @@
+[project]
+name = "extras"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pillow>=12.1.0",
+    "pyinstaller>=6.18.0",
+    "scipy>=1.17.0",
+    "tkinterdnd2>=0.4.3",
+]
