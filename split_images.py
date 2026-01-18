@@ -59,37 +59,83 @@ def process_file(file_path, output_dir="output", padding=10, min_size=128):
         
     return results
 
-def unify_sizes(image_paths, resample_filter=Image.Resampling.LANCZOS, progress_callback=None):
-    """Resizes all images to match smallest dimensions."""
+def unify_sizes(image_paths, resample_filter=Image.Resampling.LANCZOS, mode="smaller", progress_callback=None):
+    """Resizes all images based on the selected mode."""
     if not image_paths:
         return
     
-    min_w = min(w for _, w, h in image_paths)
-    min_h = min(h for _, w, h in image_paths)
+    # 1. Collect dimensions
+    dims = [(w, h) for _, w, h in image_paths]
+    min_w = min(w for w, h in dims)
+    min_h = min(h for w, h in dims)
     
+    # 2. Determine Target Canvas Size
+    target_w, target_h = min_w, min_h # Default for 'smaller'
+    
+    if mode == "width":
+        target_w = min_w
+        # Max height needed after scaling all images to target_w
+        max_scaled_h = 0
+        for w, h in dims:
+            scale = target_w / w
+            scaled_h = int(h * scale)
+            if scaled_h > max_scaled_h:
+                max_scaled_h = scaled_h
+        target_h = max_scaled_h
+        
+    elif mode == "height":
+        target_h = min_h
+        # Max width needed after scaling all images to target_h
+        max_scaled_w = 0
+        for w, h in dims:
+            scale = target_h / h
+            scaled_w = int(w * scale)
+            if scaled_w > max_scaled_w:
+                max_scaled_w = scaled_w
+        target_w = max_scaled_w
+
+    # 3. Process Images
     total = len(image_paths)
     for i, (path, w, h) in enumerate(image_paths):
         if progress_callback:
             progress_callback(i + 1, total, f"Unifying: {os.path.basename(path)}")
             
-        if w == min_w and h == min_h:
-            continue
-            
-        img = Image.open(path).convert("RGBA")
-        scale = min(min_w / w, min_h / h)
-        new_w = int(w * scale)
-        new_h = int(h * scale)
+        # Calculate new size for this specific image
+        new_w, new_h = w, h
         
-        img = img.resize((new_w, new_h), resample_filter)
-        
-        canvas = Image.new("RGBA", (min_w, min_h), (0, 0, 0, 0))
-        x_offset = (min_w - new_w) // 2
-        y_offset = (min_h - new_h) // 2
-        canvas.paste(img, (x_offset, y_offset))
-        
-        canvas.save(path, "PNG")
+        if mode == "width":
+            scale = target_w / w
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+        elif mode == "height":
+            scale = target_h / h
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+        else: # smaller (default)
+             scale = min(target_w / w, target_h / h)
+             new_w = int(w * scale)
+             new_h = int(h * scale)
 
-def split_images(input_path=".", output_dir="output", padding=10, min_size=128, unify=False, resample_filter=Image.Resampling.LANCZOS, progress_callback=None):
+        # Skip if already perfect (rare with padding logic change, but okay for exact matches)
+        # Note: checking just w/h might skip padding, so we check new_w/h against target
+        if new_w == target_w and new_h == target_h and w == new_w and h == new_h:
+             continue
+        
+        try:
+            img = Image.open(path).convert("RGBA")
+            img = img.resize((new_w, new_h), resample_filter)
+            
+            canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+            x_offset = (target_w - new_w) // 2
+            y_offset = (target_h - new_h) // 2
+            canvas.paste(img, (x_offset, y_offset))
+            
+            canvas.save(path, "PNG")
+        except Exception as e:
+            print(f"Error unifying {path}: {e}")
+
+
+def split_images(input_path=".", output_dir="output", padding=10, min_size=128, unify=False, resample_filter=Image.Resampling.LANCZOS, unify_mode="smaller", progress_callback=None):
     """Splits transparent images."""
     os.makedirs(output_dir, exist_ok=True)
     
@@ -115,7 +161,7 @@ def split_images(input_path=".", output_dir="output", padding=10, min_size=128, 
         all_results.extend(process_file(file_path, output_dir, padding, min_size))
 
     if unify and all_results:
-        unify_sizes(all_results, resample_filter, progress_callback)
+        unify_sizes(all_results, resample_filter, unify_mode, progress_callback)
 
 if __name__ == "__main__":
     split_images()
