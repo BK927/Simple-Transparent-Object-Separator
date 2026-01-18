@@ -59,7 +59,7 @@ def process_file(file_path, output_dir="output", padding=10, min_size=128):
         
     return results
 
-def unify_sizes(image_paths, progress_callback=None):
+def unify_sizes(image_paths, resample_filter=Image.Resampling.LANCZOS, progress_callback=None):
     """Resizes all images to match smallest dimensions."""
     if not image_paths:
         return
@@ -80,7 +80,7 @@ def unify_sizes(image_paths, progress_callback=None):
         new_w = int(w * scale)
         new_h = int(h * scale)
         
-        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        img = img.resize((new_w, new_h), resample_filter)
         
         canvas = Image.new("RGBA", (min_w, min_h), (0, 0, 0, 0))
         x_offset = (min_w - new_w) // 2
@@ -89,7 +89,7 @@ def unify_sizes(image_paths, progress_callback=None):
         
         canvas.save(path, "PNG")
 
-def split_images(input_path=".", output_dir="output", padding=10, min_size=128, unify=False, progress_callback=None):
+def split_images(input_path=".", output_dir="output", padding=10, min_size=128, unify=False, resample_filter=Image.Resampling.LANCZOS, progress_callback=None):
     """Splits transparent images."""
     os.makedirs(output_dir, exist_ok=True)
     
@@ -115,7 +115,7 @@ def split_images(input_path=".", output_dir="output", padding=10, min_size=128, 
         all_results.extend(process_file(file_path, output_dir, padding, min_size))
 
     if unify and all_results:
-        unify_sizes(all_results, progress_callback)
+        unify_sizes(all_results, resample_filter, progress_callback)
 
 if __name__ == "__main__":
     split_images()

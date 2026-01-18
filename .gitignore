@@ -14,3 +14,6 @@ output/
 
 # PyInstaller
 *.spec
+
+# Test
+test/

@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import threading
+from PIL import Image
 import split_images
 
 class App(TkinterDnD.Tk):
@@ -33,6 +34,21 @@ class App(TkinterDnD.Tk):
             activebackground="#2b2b2b", activeforeground="#fff"
         )
         self.unify_check.grid(row=1, column=0, columnspan=2, sticky="w", pady=(5, 0))
+        
+        # Resize Algorithm option
+        tk.Label(options_frame, text="Resize Algo:", fg="#fff", bg="#2b2b2b").grid(row=2, column=0, sticky="w", pady=(5, 0))
+        self.algo_var = tk.StringVar(value="LANCZOS")
+        self.algo_combo = ttk.Combobox(
+            options_frame, 
+            textvariable=self.algo_var,
+            values=[
+                "LANCZOS", "BICUBIC", "BILINEAR", "BOX", "NEAREST", "HAMMING",
+                "Nearest Neighbor", "Sharp Bilinear", "Area Sampling"
+            ],
+            state="readonly",
+            width=15
+        )
+        self.algo_combo.grid(row=2, column=1, padx=5, pady=(5, 0), sticky="w")
         
         # Drop area
         self.label = tk.Label(
@@ -75,7 +91,21 @@ class App(TkinterDnD.Tk):
         
         unify = self.unify_var.get()
         
-        thread = threading.Thread(target=self.process_files, args=(png_files, min_size, unify))
+        algo_name = self.algo_var.get()
+        algo_map = {
+            "LANCZOS": Image.Resampling.LANCZOS,
+            "BICUBIC": Image.Resampling.BICUBIC,
+            "BILINEAR": Image.Resampling.BILINEAR,
+            "BOX": Image.Resampling.BOX,
+            "NEAREST": Image.Resampling.NEAREST,
+            "HAMMING": Image.Resampling.HAMMING,
+            "Nearest Neighbor": Image.Resampling.NEAREST,
+            "Sharp Bilinear": Image.Resampling.HAMMING,
+            "Area Sampling": Image.Resampling.BOX,
+        }
+        resample_filter = algo_map.get(algo_name, Image.Resampling.LANCZOS)
+
+        thread = threading.Thread(target=self.process_files, args=(png_files, min_size, unify, resample_filter))
         thread.start()
 
     def update_progress(self, current, total, message):
@@ -84,7 +114,7 @@ class App(TkinterDnD.Tk):
         self.after(0, lambda: self.progress.configure(value=percent))
         self.after(0, lambda: self.status_label.configure(text=message))
 
-    def process_files(self, files, min_size, unify):
+    def process_files(self, files, min_size, unify, resample_filter):
         try:
             if getattr(sys, 'frozen', False):
                 base_dir = os.path.dirname(sys.executable)
@@ -97,6 +127,7 @@ class App(TkinterDnD.Tk):
                 output_dir=output_dir, 
                 min_size=min_size, 
                 unify=unify,
+                resample_filter=resample_filter,
                 progress_callback=self.update_progress
             )
             self.after(0, lambda: self.label.config(text="Done!"))
